@@ -8,7 +8,7 @@
 
 ## Soal 1
 Sebagai pusat kesadaran The Mesh, rootkit harus merentangkan koneksinya ke lima gerbang utama (Switch). Kita tetapkan alamat IP dan default gateway untuk seluruh entitas, mulai dari para operator (**alpha, beta, gamma**), penjaga directory (**prab, tedd**), gerbang penyaring (**abbey, penny**), hingga repository (**obladi, desmond, oblada, molly**).
-![image](/assets/soal_1/topologi.png)
+![image](/assets/topologi.png)
 
 Uji coba ping gateway lokal router:
 ```
@@ -165,7 +165,7 @@ host tedd.<xxxx>.com
 ```
 Harus mengembalikan IP `prab` dan `tedd` masing-masing.
 
-![image](assets/soal_1/soal4.png)
+![image](assets/soal4.png)
 
 ## Soal 5
 Soal kali ini terdiri dari 2 bagian utama, `Hostname System-wide`: Setiap node (misalnya `alpha`) harus punya hostname sesuai namanya di sistem operasi (`/etc/hostname` dan `/etc/hosts`) dan `Subdomain DNS di BIND9`: Di server DNS (`prab`), buatkan Record A untuk semua node agar nama seperti alpha.k15.com, beta.k15.com, dst., bisa di-ping dan di-host dari client.
@@ -215,9 +215,9 @@ hostname tedd && echo "tedd" > /etc/hostname
 ```
 setelah itu ketik `hostname` di terminal node manapun dia bakal menjawab dirinya sendiri.
 
-![image](assets/soal_1/soal5.png)
+![image](assets/soal5.png)
 
-![image](assets/soal_1/soal5.2.png)
+![image](assets/soal5.2.png)
 
 ## Soal 6
 Soal kali ini verifikasi sinkronisasi otomatis antara DNS Master `prab` dan DNS Slave `tedd`.
@@ -237,7 +237,7 @@ output yang keluar
 prab.k15.com. root.k15.com. 2026100105 604800 86400 2419200 604800
 ```
 
-![image](assets/soal_1/soal6.png)
+![image](assets/soal6.png)
 
 selanjutnya cek angka serial SOA di slave `tedd`, jalankan di terminal `tedd`
 ```
@@ -248,7 +248,7 @@ output yang keluar
 prab.k15.com. root.k15.com. 2026100105 604800 86400 2419200 604800
 ```
 
-![image](assets/soal_1/soal6.2.png)
+![image](assets/soal6.2.png)
 
 Langkah ketiga memastikan file salinan zona benar-benar diterima dari prab, jalankan perintah berikut di terminal `tedd`
 ```
@@ -278,7 +278,7 @@ verifikasi kembali
 ```
 ls -l /var/lib/bind/k15.com
 ```
-![image](assets/soal_1/soal6.3.png)
+![image](assets/soal6.3.png)
 
 langkah terakhir verifikasi serial SOA jika kedua perintah tersebut memunculkan nomor serial yang sama persis (misalnya 2026100105), maka poin konfigurasi DNS Master-Slave ini sudah selesai.
 
@@ -292,8 +292,8 @@ dig @10.71.3.2 k15.com SOA +short
 dig @10.71.3.3 k15.com SOA +short
 ```
 
-![image](assets/soal_1/soal6.4.png)
+![image](assets/soal6.4.png)
 
-![image](assets/soal_1/soal6.5.png)
+![image](assets/soal6.5.png)
 
 ## Soal 7
