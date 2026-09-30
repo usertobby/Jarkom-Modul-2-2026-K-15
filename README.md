@@ -180,7 +180,7 @@ Soal kali ini terdiri dari 2 bagian utama, `Hostname System-wide`: Setiap node (
 
 Aturan Pengecualian (prab & tedd): Subdomain prab.k15.com dan tedd.k15.com tidak perlu dibuat lagi di daftar record baru ini karena sudah dibuat sebelumnya pada Soal No. 4 sebagai Name Server.
 
-Langkah pertamanya tambahkan record semua node di `prab`, buka terminal di nodde `prab` untuk mengedit file zone BIND9
+Langkah pertamanya tambahkan record semua node di `prab`, buka terminal di node `prab` untuk mengedit file zone BIND9
 ```
 nano /etc/bind/jarkom/k15.com
 ```
@@ -200,12 +200,12 @@ desmond IN      A       <IP_DESMOND>
 oblada  IN      A       <IP_OBLADA>
 molly   IN      A       <IP_MOLLY>
 ```
-Di bagian atas file zone, ubah Serial dari 2026100101 menjadi 2026100102 (supaya Node tedd mau melakukan sync/transfer zone otomatis), simpan lalu keluar. Cek syntax dan restart
+Di bagian atas file zone, ubah Serial dari 2026100101 menjadi 2026100105 (supaya Node tedd mau melakukan sync/transfer zone otomatis), simpan lalu keluar. Cek syntax dan restart
 ```
 named-checkzone k15.com /etc/bind/jarkom/k15.com
 service named restart
 ```
-Langkah kedua set hostname di masing-masing node kecuali `rootkid` seperti tadi, tujuannya agar saat berada di terminal node tersebut sistemnya tau siapa dirinya sendiri. Buka terminal masing-masing node lalu jalankan
+Langkah kedua set hostname di masing-masing node kecuali `rootkid` seperti tadi, tujuannya agar saat berada di terminal node tersebut sistemnya tau siapa dirinya sendiri. Buka terminal masing-masing node lalu jalankan (jika manual)
 ```
 hostname alpha && echo "alpha" > /etc/hostname
 hostname beta && echo "beta" > /etc/hostname
@@ -221,11 +221,107 @@ hostname molly && echo "molly" > /etc/hostname
 hostname prab && echo "prab" > /etc/hostname
 hostname tedd && echo "tedd" > /etc/hostname
 ```
+
+**ATAU**, kita juga bisa menambahkan langsung di configure network agar selalu menyala setiap node. Ditambahkannya itu setelah bagian `nameserver 192.168.122.1`.
+
+router sentral rootkit:
+```
+up hostname rootkit && echo "rootkit" > /etc/hostname
+up echo "127.0.1.1 rootkit" >> /etc/hosts
+```
+
+alpha:
+```
+up hostname alpha && echo "alpha" > /etc/hostname
+up echo "127.0.1.1 alpha" >> /etc/hosts
+```
+
+beta:
+```
+up hostname beta && echo "beta" > /etc/hostname
+up echo "127.0.1.1 beta" >> /etc/hosts
+```
+
+gamma:
+```
+up hostname gamma && echo "gamma" > /etc/hostname
+up echo "127.0.1.1 gamma" >> /etc/hosts
+```
+
+abbey:
+```
+up hostname abbey && echo "abbey" > /etc/hostname
+up echo "127.0.1.1 abbey" >> /etc/hosts
+```
+
+penny:
+```
+up hostname penny && echo "penny" > /etc/hostname
+up echo "127.0.1.1 penny" >> /etc/hosts
+```
+
+delta:
+```
+up hostname delta && echo "delta" > /etc/hostname
+up echo "127.0.1.1 delta" >> /etc/hosts
+```
+
+epsilon:
+```
+up hostname epsilon && echo "epsilon" > /etc/hostname
+up echo "127.0.1.1 epsilon" >> /etc/hosts
+```
+
+prab:
+```
+up hostname prab && echo "prab" > /etc/hostname
+up echo "127.0.1.1 prab" >> /etc/hosts
+```
+
+tedd:
+```
+up hostname tedd && echo "tedd" > /etc/hostname
+up echo "127.0.1.1 tedd" >> /etc/hosts
+```
+
+obladi:
+```
+up hostname obladi && echo "obladi" > /etc/hostname
+up echo "127.0.1.1 obladi" >> /etc/hosts
+```
+
+desmond:
+```
+up hostname desmond && echo "desmond" > /etc/hostname
+up echo "127.0.1.1 desmond" >> /etc/hosts
+```
+
+oblada:
+```
+up hostname oblada && echo "oblada" > /etc/hostname
+up echo "127.0.1.1 oblada" >> /etc/hosts
+```
+
+molly:
+```
+up hostname molly && echo "molly" > /etc/hostname
+up echo "127.0.1.1 molly" >> /etc/hosts
+```
+
+Kemudian, execute script `soal_5.sh` untuk memperbarui jika mengikuti langkah yang "up hostname..."
+
 setelah itu ketik `hostname` di terminal node manapun dia bakal menjawab dirinya sendiri.
 
 ![image](assets/soal5.png)
 
 ![image](assets/soal5.2.png)
+
+Uji subdomain node (misal dari alpha) dengan:
+```
+ping -c 2 beta.k15.com
+host molly.k15.com
+host penny.k15.com
+```
 
 ## Soal 6
 Soal kali ini verifikasi sinkronisasi otomatis antara DNS Master `prab` dan DNS Slave `tedd`.
@@ -303,5 +399,7 @@ dig @10.71.3.3 k15.com SOA +short
 ![image](assets/soal6.4.png)
 
 ![image](assets/soal6.5.png)
+
+Alternatifnya, bisa tinggal mengeksekusi skrip `soal_6_prab.sh` dan `soal_6_tedd.sh`.
 
 ## Soal 7
