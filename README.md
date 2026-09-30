@@ -403,3 +403,81 @@ dig @10.71.3.3 k15.com SOA +short
 Alternatifnya, bisa tinggal mengeksekusi skrip `soal_6_prab.sh` dan `soal_6_tedd.sh`.
 
 ## Soal 7
+Pada soal ini kita diminta untuk menambahkan  pada zona `k15.com` A record untuk `vault.k15.com` (IP obladi & desmond), dan `core.k15.com` (IP oblada & molly). Kita juga tetapkan CNAME:  
+- `www.k15.com` → `penny.k15.com`
+- `static.k15.com` → `abbey.k15.com`
+
+Lalu kita akan verifikasi dari dua klien berbeda bahwa seluruh hostname tersebut ter-resolve ke tujuan yang benar dan konsisten.
+
+Pada node `prab`, buka file database zona yang terletak di `/etc/bind/jarkom/k15.com`:
+```
+nano /etc/bind/jarkom/k15.com
+```
+
+WAJIB lakukan penambahan angka serial pada baris SOA:
+```
+(misal dari `2026100105` menjadi `2026100107`).
+```
+![image](/assets/soal7.png)
+Hal ini wajib dilakukan agar BIND9 mengenali adanya pembaruan data dan mengirim sinyal NOTIFY ke server slave (`tedd`). Tambahkan juga Record A dan CNAME dengan tambahan baris berikut di bagian bawah file:
+```
+; Soal 7: A Record vault (obladi & desmond) - DNS Round Robin
+vault   IN      A       10.71.3.4
+vault   IN      A       10.71.3.5
+
+; Soal 7: A Record core (oblada & molly) - DNS Round Robin
+core    IN      A       10.71.3.6
+core    IN      A       10.71.3.7
+
+; Soal 7: CNAME Records
+www     IN      CNAME   penny.k15.com.
+static  IN      CNAME   abbey.k15.com.
+```
+![image](/assets/soal7.1.png)
+Simpan file dengan menekan `Ctrl + O` lalu tekan `Enter`, kemudian keluar menggunakan `Ctrl + X`.
+
+Kemudian kita restart layanan di `prab`. Sebelum merestart layanan, periksa apakah ada kesalahan sintaks atau format penulisan:
+```
+named-checkzone k15.com /etc/bind/jarkom/k15.com
+```
+
+Jika sudah valid (OK), jalankan:
+```
+service named restart
+```
+
+Setelah itu, sinkronisasi di terminal node `tedd` (Slave DNS).
+```
+service named restart
+sleep 2
+dig @10.71.3.3 k15.com SOA +short
+```
+![image](/assets/soal7.2.png)  
+Pastikan nomor serial yang keluar sudah sama (`2026100107`).
+
+Verifikasi dari Klien 1 (`alpha`):
+```
+# 1. Tes vault.k15.com (harus merespons IP obladi & desmond)
+host vault.k15.com
+
+# 2. Tes core.k15.com (harus merespons IP oblada & molly)
+host core.k15.com
+
+# 3. Tes CNAME www.k15.com (alias ke penny.k15.com -> 10.71.4.2)
+host www.k15.com
+
+# 4. Tes CNAME static.k15.com (alias ke abbey.k15.com -> 10.71.2.2)
+host static.k15.com
+```
+![image](/assets/soal7.3.png)
+
+Verifikasi dari Klien 2 (`delta`)
+```
+host vault.k15.com
+host core.k15.com
+host www.k15.com
+host static.k15.com
+```
+![image](/assets/soal7.4.png)
+
+Hasilnya, node `delta` memberikan jawaban yang konsisten dan mengembalikan pasangan IP serta alias yang sama seperti pada node `alpha`.
