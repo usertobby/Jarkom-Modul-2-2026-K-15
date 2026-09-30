@@ -146,7 +146,7 @@ simpan lalu keluar, lalu restart service seperti tadi
 ```
 service named restart
 ```
-selanjutnya perbarui resolver di semua node non router. Jalankan perintah ini di semua node selain `rootkit` (`alpha`, `beta`, `gamma`, `delta`, `epsilon`, `abbey`, `penny`, `obladi`, `desmond`, `oblada`, `molly`, serta `prab` & `tedd`)
+selanjutnya perbarui resolver di semua node non router. Jalankan perintah ini dengan file `soal_4_client.sh` di semua node selain `rootkit` (`alpha`, `beta`, `gamma`, `delta`, `epsilon`, `abbey`, `penny`, `obladi`, `desmond`, `oblada`, `molly`, serta `prab` & `tedd`)
 ```
 cat <<EOF > /etc/resolv.conf
 nameserver <IP_PRAB>
@@ -154,14 +154,22 @@ nameserver <IP_TEDD>
 nameserver 192.168.122.1
 EOF
 ```
+
+Atau bisa juga dengan menambahkan langsung di configure network agar selalu menyala setiap node dijalankan dengan:
+```
+up echo "nameserver 10.71.3.2" > /etc/resolv.conf
+up echo "nameserver 10.71.3.3" >> /etc/resolv.conf
+up echo "nameserver 192.168.122.1" >> /etc/resolv.conf
+```
+
 uji hasilnya dengan
 ```
-host <xxxx>.com
+host k15.com
 ```
 harus mengembalikan IP dari Penny
 ```
-host prab.<xxxx>.com
-host tedd.<xxxx>.com
+host prab.k15.com
+host tedd.k15.com
 ```
 Harus mengembalikan IP `prab` dan `tedd` masing-masing.
 
