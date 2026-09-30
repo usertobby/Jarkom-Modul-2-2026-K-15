@@ -481,3 +481,483 @@ host static.k15.com
 ![image](/assets/soal7.4.png)
 
 Hasilnya, node `delta` memberikan jawaban yang konsisten dan mengembalikan pasangan IP serta alias yang sama seperti pada node `alpha`.
+
+## Soal 8
+Soal kali ini membuat reverse DNS (PTR Record). Jika sebelumnya kita melakukan Forward Lookup (mencari IP berdasarkan nama domain, contoh: vault.k15.com $\rightarrow$ IP), maka Reverse DNS adalah kebalikannya: mencari nama hostname berdasarkan IP address (contoh: IP 10.71.2.2 $\rightarrow$ abbey.k15.com).
+
+Langkah pertama pastikan direktori penyimpanan file zona di `prab` benar-benar ada
+```
+mkdir -p /etc/bind/jarkom
+```
+Buka file konfigurasi lokal BIND9 di prab
+```
+nano /etc/bind/named.conf.local
+```
+isi dengan konfigurasi master untuk domain utama (k15.com) dan ketiga reverse zone berikut
+```
+zone "k15.com" {
+    type master;
+    file "/etc/bind/jarkom/k15.com";
+    allow-transfer { 10.71.3.3; };
+};
+
+zone "2.71.10.in-addr.arpa" {
+    type master;
+    file "/etc/bind/jarkom/2.71.10.rev";
+    allow-transfer { 10.71.3.3; };
+};
+
+zone "4.71.10.in-addr.arpa" {
+    type master;
+    file "/etc/bind/jarkom/4.71.10.rev";
+    allow-transfer { 10.71.3.3; };
+};
+
+zone "3.71.10.in-addr.arpa" {
+    type master;
+    file "/etc/bind/jarkom/3.71.10.rev";
+    allow-transfer { 10.71.3.3; };
+};
+```
+Buat File Zona Utama & Reverse di `prab`
+
+File zona utama (k15.com)
+```
+cat <<EOF > /etc/bind/jarkom/k15.com
+\$TTL    604800
+@       IN      SOA     prab.k15.com. root.k15.com. (
+                          2026100101 ; Serial
+                              604800 ; Refresh
+                               86400 ; Retry
+                             2419200 ; Expire
+                              604800 ) ; Negative Cache TTL
+;
+@       IN      NS      prab.k15.com.
+@       IN      NS      tedd.k15.com.
+
+prab    IN      A       10.71.3.2
+tedd    IN      A       10.71.3.3
+abbey   IN      A       10.71.2.2
+penny   IN      A       10.71.4.2
+
+vault   IN      A       10.71.3.4
+vault   IN      A       10.71.3.5
+
+core    IN      A       10.71.3.6
+core    IN      A       10.71.3.7
+
+www     IN      CNAME   penny.k15.com.
+static  IN      CNAME   abbey.k15.com.
+EOF
+```
+File Reverse Zone 2.71.10.rev (Subnet Abbey - 10.71.2.2)
+```
+cat <<EOF > /etc/bind/jarkom/2.71.10.rev
+\$TTL    604800
+@       IN      SOA     prab.k15.com. root.k15.com. (
+                          2026100101 ; Serial
+                              604800 ; Refresh
+                               86400 ; Retry
+                             2419200 ; Expire
+                              604800 ) ; Negative Cache TTL
+;
+@       IN      NS      prab.k15.com.
+@       IN      NS      tedd.k15.com.
+
+2       IN      PTR     abbey.k15.com.
+EOF
+```
+File Reverse Zone 4.71.10.rev (Subnet Penny - 10.71.4.2)
+```
+cat <<EOF > /etc/bind/jarkom/4.71.10.rev
+\$TTL    604800
+@       IN      SOA     prab.k15.com. root.k15.com. (
+                          2026100101 ; Serial
+                              604800 ; Refresh
+                               86400 ; Retry
+                             2419200 ; Expire
+                              604800 ) ; Negative Cache TTL
+;
+@       IN      NS      prab.k15.com.
+@       IN      NS      tedd.k15.com.
+
+2       IN      PTR     penny.k15.com.
+EOF
+```
+File Reverse Zone 3.71.10.rev (Subnet Vault & Core - 10.71.3.x)
+```
+cat <<EOF > /etc/bind/jarkom/3.71.10.rev
+\$TTL    604800
+@       IN      SOA     prab.k15.com. root.k15.com. (
+                          2026100101 ; Serial
+                              604800 ; Refresh
+                               86400 ; Retry
+                             2419200 ; Expire
+                              604800 ) ; Negative Cache TTL
+;
+@       IN      NS      prab.k15.com.
+@       IN      NS      tedd.k15.com.
+
+2       IN      PTR     prab.k15.com.
+3       IN      PTR     tedd.k15.com.
+4       IN      PTR     obladi.k15.com.
+5       IN      PTR     desmond.k15.com.
+6       IN      PTR     oblada.k15.com.
+7       IN      PTR     molly.k15.com.
+EOF
+```
+Sekarang coba jalankan BIND9 di `prab` dengan perintah
+```
+/usr/sbin/named
+```
+Kalau keluar prompt kosong seperti itu setelah menjalankan /usr/sbin/named, artinya daemon BIND9 berhasil jalan dengan sukses tanpa ada error fatal yang menghentikannya.
+
+Langkah selanjutnya setup node slave `tedd`, pindah ke terminal tedd untuk menyelesaikan konfigurasi bagian slave-nya.
+
+Buka terminal `tedd` dan pastikan foldernya ada
+```
+mkdir -p /etc/bind
+```
+Edit file konfigurasi lokal di `tedd`
+```
+nano /etc/bind/named.conf.local
+```
+Masukkan konfigurasi Slave untuk reverse zone (dan domain utama jika diperlukan)
+```
+zone "k15.com" {
+    type slave;
+    masters { 10.71.3.2; };
+    file "/var/lib/bind/k15.com";
+};
+
+zone "2.71.10.in-addr.arpa" {
+    type slave;
+    masters { 10.71.3.2; };
+    file "/var/lib/bind/2.71.10.rev";
+};
+
+zone "4.71.10.in-addr.arpa" {
+    type slave;
+    masters { 10.71.3.2; };
+    file "/var/lib/bind/4.71.10.rev";
+};
+
+zone "3.71.10.in-addr.arpa" {
+    type slave;
+    masters { 10.71.3.2; };
+    file "/var/lib/bind/3.71.10.rev";
+};
+```
+jalankan
+```
+/usr/sbin/named
+```
+oh iya jika tidak bisa menjalankan itu maka harus install BIND9 dulu ya
+```
+apt-get update && apt-get install bind9 bind9utils -y
+```
+Sekarang kedua node (prab sebagai master dan tedd sebagai slave) sudah aktif menjalankan DNS server.
+
+Untuk memastikan semuanya berjalan lancar dan zona dari master berhasil melakukan zone transfer ke slave, kita bisa melakukan pengujian menggunakan perintah dig atau nslookup dari salah satu node atau client.
+
+Pengujian ini bisa kita jalankan di terminal mana saja (misalnya langsung dari terminal prab, tedd, atau client lain yang terhubung ke jaringan tersebut), cukup mengetikkan perintah dig untuk menguji query langsung ke IP Master (10.71.3.2) dan IP Slave (10.71.3.3)
+```
+dig @10.71.3.2 vault.k15.com
+dig @10.71.3.3 vault.k15.com
+```
+![image](assets/soal8.png)
+
+## Soal 9
+Soal kali ini diminta untuk mengonfigurasi web server Apache di node vault agar bisa diakses menggunakan hostname (seperti vault.k15.com), bukan alamat IP-nya secara langsung.
+
+Selain itu, di dalam web server tersebut harus ada folder /arsip/ yang fitur autoindex (directory listing)-nya diaktifkan, sehingga kalau folder itu dibuka lewat browser, daftar file yang ada di dalamnya akan otomatis tampil berbentuk daftar/tabel direktori yang bisa diklik dan ditelusuri.
+
+Langkah pertama masuk ke node `vault` dan install apache, masuk ke terminal `obladi` lalu jalankan
+```
+apt-get update && apt-get install apache2 -y
+```
+Buat direktori /arsip/ dan isi beberapa file contoh
+```
+mkdir -p /var/www/html/arsip
+echo "File arsip 1 di obladi" > /var/www/html/arsip/dokumen1.txt
+echo "Laporan penting vault" > /var/www/html/arsip/laporan.pdf
+```
+Aktifkan fitur Autoindex (Directory Listing), buat file konfigurasi direktori untuk Apache
+```
+cat <<EOF > /etc/apache2/conf-available/arsip-autoindex.conf
+<Directory /var/www/html/arsip>
+    Options Indexes FollowSymLinks
+    AllowOverride None
+    Require all granted
+</Directory>
+EOF
+```
+aktifkan konfigurasi dan modulnya
+```
+a2enconf arsip-autoindex
+a2enmod autoindex
+```
+
+![image](assets/soal9.png)
+
+Sesuai dengan saran di terminal, sekarang jalankan perintah untuk memuat ulang konfigurasi Apache
+```
+service apache2 reload
+```
+Pastikan juga layanan Apache-nya sudah aktif dan berjalan (jika belum, jalankan `service apache2 start`)
+
+Setelah itu, kamu bisa langsung melakukan pengujian dari terminal klien menggunakan hostname vault.k15.com
+```
+curl http://vault.k15.com/arsip/
+```
+
+![image](assets/soal9.2.png)
+
+## Soal 10
+Soal kali ini kita diminta untuk membangun layanan web dinamis menggunakan Nginx dan PHP-FPM pada node *core* yang nantinya diakses melalui hostname seperti `core.k15.com`. Di dalam server tersebut, kita perlu membuat aplikasi PHP sederhana yang mencakup halaman beranda serta halaman profil. Selain itu, kita juga harus menerapkan aturan *rewrite* pada konfigurasi Nginx agar URL dapat diakses secara bersih tanpa ekstensi file; contohnya ketika pengguna mengakses `[core.k15.com/profil](https://core.k15.com/profil)`, server secara *backend* akan mengarahkannya ke file `profil.php` tanpa menampilkan ekstensi `.php` di bilah alamat *browser*. Terakhir, seluruh proses pengujian ini wajib dilakukan menggunakan hostname yang telah ditentukan, bukan melalui alamat IP langsung.
+
+Langkah pertama install Nginx dan PHP-FPM, masuk ke terminal node core (`rootkids`), lalu jalankan perintah berikut untuk menginstal Nginx serta PHP-FPM
+```
+apt-get update && apt-get install nginx php-fpm -y
+```
+selanjutnya buat aplikasi PHP sederhana, buat direktori web root untuk aplikasi core, lalu buat file index.php (beranda) dan profil.php (profil).
+
+Buat foldernya
+```
+mkdir -p /var/www/html/core
+```
+buat halaman beranda
+```
+cat <<EOF > /var/www/html/core/index.php
+<!DOCTYPE html>
+<html>
+<head><title>Beranda - Core</title></head>
+<body>
+    <h1>Selamat Datang di Halaman Beranda Core</h1>
+    <p><a href="/profil">Ke Halaman Profil</a></p>
+</body>
+</html>
+EOF
+```
+buat halaman profil
+```
+cat <<EOF > /var/www/html/core/profil.php
+<!DOCTYPE html>
+<html>
+<head><title>Profil - Core</title></head>
+<body>
+    <h1>Halaman Profil Pengguna</h1>
+    <p>Ini adalah halaman profil dengan URL bersih (Clean URL).</p>
+    <p><a href="/">Kembali ke Beranda</a></p>
+</body>
+</html>
+EOF
+```
+selanjutnya konfigurasi Nginx dan aturan URL rewrite, Kita perlu mengatur Nginx agar mengenali PHP-FPM dan menerapkan aturan rewrite agar /profil dapat membuka profil.php secara transparan tanpa menampilkan ekstensinya.
+
+Buat file konfigurasi baru untuk server block Nginx
+```
+nano /etc/nginx/sites-available/core.conf
+```
+Masukkan konfigurasi berikut (sesuaikan socket PHP-FPM, misal php8.2-fpm.sock atau php-fpm.sock)
+```
+server {
+    listen 80;
+    server_name core.k15.com;
+    root /var/www/html/core;
+    index index.php index.html index.htm;
+
+    location / {
+        try_files $uri $uri/ @extensionless;
+    }
+
+    # Aturan rewrite untuk URL bersih tanpa .php
+    location @extensionless {
+        rewrite ^(.*)$ $1.php last;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        # Sesuaikan path socket php-fpm di bawah ini dengan sistem Anda
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock; 
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+```
+Aktifkan konfigurasi dengan membuat symlink ke sites-enabled dan hapus default config jika perlu
+```
+ln -s /etc/nginx/sites-available/core.conf /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+```
+jalankan dan restart layanan, pastikan PHP-FPM dan Nginx berjalan dengan normal
+```
+service php8.4-fpm start
+# Atau sesuaikan nama layanan php-fpm Anda (misal: service php-fpm start)
+
+nginx -t
+service nginx restart
+```
+
+![image](assets/soal10.png)
+
+Sekarang, saatnya melakukan pengujian akhir sesuai ketentuan soal (wajib menggunakan hostname, bukan IP address)
+
+```
+curl http://core.k15.com/
+curl http://core.k15.com/profil
+```
+kalau tidak bisa coba mapping manual ke file /etc/hosts di node `rootkit` agar langsung menembak ke dirinya sendiri
+```
+echo "127.0.0.1 core.k15.com" >> /etc/hosts
+```
+coba ulangi lagi
+```
+curl http://core.k15.com/
+curl http://core.k15.com/profil
+```
+
+![image](assets/soal10.2.png)
+
+## Soal 11
+Sekarang kita diminta untuk mengonfigurasi dua node khusus sebagai reverse proxy yang bertindak sebagai gerbang depan untuk menerima dan meneruskan permintaan ke server backend di belakangnya. Node `Penny` yang menggunakan Apache dikonfigurasi sebagai reverse proxy untuk mendistribusikan lalu lintas ke area vault yang mencakup node `Obladi` dan `Desmond`, sementara node `Abbey` yang menggunakan Nginx bertugas meneruskan lalu lintas ke area core yang mencakup `Oblada` dan `Molly`.
+
+Selain berfungsi sebagai pengatur rute dan load balancer, kedua gerbang ini wajib meneruskan identitas asli pengunjung dengan cara meneruskan header Host dan X-Real-IP. Hal ini penting agar server backend di belakangnya dapat mengenali alamat IP asli klien yang mengakses alih-alih hanya mendeteksi alamat IP dari proxy itu sendiri.
+
+Terakhir, kita perlu melakukan pembuktian untuk memastikan bahwa `Penny` dan `Abbey` benar-benar bekerja secara optimal. Pembuktian ini biasanya dilakukan dengan mengirimkan perintah curl secara berulang ke domain proxy terkait, kemudian memeriksa access log pada masing-masing server backend guna memvalidasi bahwa lalu lintas berhasil terdistribusi secara merata dan header pengenal aslinya diteruskan dengan tepat.
+
+Langkah pertama konfigurasi `Penny` (Apache Reverse Proxy ke Vault), Masuk ke node `Penny`, lalu siapkan modul dan konfigurasi Apache.
+
+Install dan Aktifkan Modul Proxy Apache, jalankan di terminal `Penny`
+```
+apt update && apt install -y apache2
+a2enmod proxy proxy_http proxy_balancer lbmethod_byrequests headers
+```
+Buat file konfigurasi baru untuk reverse proxy vault
+```
+nano /etc/apache2/sites-available/vault-proxy.conf
+```
+Masukkan konfigurasi berikut (sesuaikan <IP_OBLADI> dan <IP_DESMOND> dengan alamat IP yang sesuai)
+```
+<VirtualHost *:80>
+    ServerName vault.k15.com
+
+    # Meneruskan identitas asli pengunjung
+    ProxyPreserveHost On
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+
+    # Load balancing ke Obladi dan Desmond
+    <Proxy balancer://vaultcluster>
+        BalancerMember http://<IP_OBLADI>
+        BalancerMember http://<IP_DESMOND>
+        ProxySet lbmethod=byrequests
+    </Proxy>
+
+    ProxyPass / balancer://vaultcluster/
+    ProxyPassReverse / balancer://vaultcluster/
+</VirtualHost>
+```
+Simpan file tersebut, lalu aktifkan konfigurasi dan restart layanan Apache
+```
+service apache2 restart
+```
+sekarang beralih ke node `abbey` untuk mengonfigurasinya sebagai reverse proxy Nginx menuju area core (`Oblada` & `Molly`). Masuk ke terminal `abbey` lalu install nginx jika belum ada
+```
+apt update && apt install -y nginx
+```
+Buat file konfigurasi proxy baru
+```
+nano /etc/nginx/sites-available/core-proxy.conf
+```
+Masukkan konfigurasi berikut (sesuaikan <IP_OBLADA> dan <IP_MOLLY> dengan IP backend yang bersangkutan)
+```
+upstream core_cluster {
+    server <IP_OBLADA>;
+    server <IP_MOLLY>;
+}
+
+server {
+    listen 80;
+    server_name core.k15.com;
+
+    location / {
+        proxy_pass http://core_cluster;
+
+        # Meneruskan header Host dan X-Real-IP sesuai ketentuan
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+Aktifkan konfigurasi dan restart Nginx
+```
+ln -s /etc/nginx/sites-available/core-proxy.conf /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+service nginx restart
+```
+Sekarang kita masuk ke tahap pembuktian (testing) untuk memastikan `Penny` dan `Abbey` berhasil mendistribusikan lalu lintas ke backend serta meneruskan header identitas asli dengan tepat.
+
+Lakukan perintah curl berulang kali ke arah reverse proxy `Penny` dan `Abbey` (pastikan domainnya sudah disesuaikan atau diarahkan ke IP proxy di /etc/hosts jika diperlukan)
+```
+# Menguji load balancing ke area Vault melalui Penny
+curl -I http://vault.k15.com/
+curl -I http://vault.k15.com/
+
+# Menguji load balancing ke area Core melalui Abbey
+curl -I http://core.k15.com/
+curl -I http://core.k15.com/
+```
+
+![image](assets/soal11.png)
+
+oiya pastikan layanan web server `oblada` dan `molly` aktif pada port 80.
+
+## Soal 12
+Sekarang kita diminta untuk mengamankan direktori atau path /admin pada server Penny menggunakan fitur HTTP Basic Authentication.
+
+Artinya, siapa pun yang mencoba mengakses [http://vault.k15.com/admin](http://vault.k15.com/admin) (atau IP `Penny` bagian vault) melalui browser atau perintah curl akan ditolak dan diminta memasukkan username dan password terlebih dahulu. Akses hanya akan diberikan jika memasukkan kombinasi kredensial yang tepat.
+
+Masuk ke terminal Penny, lalu pastikan tools utilitas Apache untuk enkripsi password sudah terinstal
+```
+apt update && apt install -y apache2-utils
+```
+Buat file penyimpanan password (misalnya di /etc/apache2/.htpasswd) dan masukkan username `prabs`
+```
+htpasswd -c /etc/apache2/.htpasswd prabs
+```
+Saat perintah ini dijalankan, terminal akan meminta kamu mengetikkan password. Masukkan password sesuai soal yaitu pakar_pinter_jadi_gob*** (teks password tidak akan nampak saat diketik demi keamanan, cukup ketik lalu tekan Enter).
+
+Buka file konfigurasi VirtualHost Penny (biasanya terletak di /etc/apache2/sites-available/vault-proxy.conf atau file konfigurasi default yang kamu gunakan), lalu tambahkan blok <Location /admin> di dalamnya
+```
+<VirtualHost *:80>
+    ServerName vault.k15.com
+
+    ProxyPreserveHost On
+    ProxyPass / balancer://vaultcluster/
+    ProxyPassReverse / balancer://vaultcluster/
+
+    <Proxy balancer://vaultcluster>
+        BalancerMember http://10.71.x.x route=obladi
+        BalancerMember http://10.71.x.x route=desmond
+        ProxySet lbmethod=byrequests
+    </Proxy>
+
+    # --- TAMBAHKAN BAGIAN INI ---
+    <Location /admin>
+        AuthType Basic
+        AuthName "Area Rahasia Sindikat"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+    </Location>
+</VirtualHost>
+```
+Uji coba akses ke path /admin untuk memastikan proteksinya berfungsi
+```
+curl -I http://vault.k15.com/admin
+```
+Masuk ke server backend vault (`Obladi` dan `Desmond`), lalu buat folder atau file kosong untuk /admin agar tidak 404
+
+BELUM SELESAIIIIIII
+SUSAH BGT WOIII
