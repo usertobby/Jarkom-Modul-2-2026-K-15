@@ -1084,3 +1084,176 @@ done
 ![image](assets/soal12.3.png)
 
 ## Soal 13
+Pada soal ini diminta penerapan standarisasi nama kanonik (canonical hostname) melalui mekanisme HTTP Redirection:
+- Pada Penny (Apache): Setiap akses langsung via IP Penny (`10.71.4.2`) maupun via domain `penny.k15.com` harus dialihkan secara permanen (Status Code 301 Moved Permanently) ke domain resmi `[www.k15.com](https://www.k15.com)`.
+
+- Pada Abbey (Nginx): Setiap akses langsung via IP Abbey (`10.71.2.2`) maupun via domain `abbey.k15.com` harus dialihkan secara sementara (Status Code 302 Found) ke domain resmi `static.k15.com`.
+
+Pertama, buka terminal `penny`:
+```
+nano /etc/apache2/sites-available/penny-redirect.conf
+```
+Masukkan:
+```
+<VirtualHost *:80>
+    ServerName 10.71.4.2
+    ServerAlias penny.k15.com
+
+    Redirect permanent / http://www.k15.com/
+</VirtualHost>
+```
+
+Kemudian, aktifkan modul dan cek:
+```
+a2ensite penny-redirect.conf
+# lalu
+apache2ctl configtest
+```
+
+Setelah itu, restart:
+```
+service apache2 restart
+```
+
+Selanjutnya, lakukan hal yang sama pada terminal `abbey` jika sebelumnya belum pernah dibuat.  
+Apabila sebelumnya sudah pernah dibuat, maka tidak perlu membuat file `abbey-redirect.conf`, cukup buka yang ada pada `core-proxy.conf`.
+```
+nano /etc/nginx/sites-available/core-proxy.conf
+```
+
+Sebelumnya seharusnya tampilan seperti ini:
+```
+upstream core_cluster {
+    server 10.71.3.6:80;
+    server 10.71.3.7:80;
+}
+
+server {
+    listen 80;
+    server_name core.k15.com abbey.k15.com static.k15.com;
+
+    location / {
+        proxy_pass http://core_cluster;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+Sebaiknya, kita **pisahkan** dia menjadi seperti ini:
+```
+upstream core_cluster {
+    server 10.71.3.6:80;
+    server 10.71.3.7:80;
+}
+
+# Redirect untuk Abbey
+server {
+    listen 80;
+    server_name abbey.k15.com 10.71.2.2;
+
+    return 302 http://static.k15.com$request_uri;
+}
+
+# Reverse proxy Core
+server {
+    listen 80;
+    server_name core.k15.com;
+
+    location / {
+        proxy_pass http://core_cluster;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+Setelah mengubah, lakukan:
+```
+nginx -t
+```
+Jika sudah OK, silakan restart:
+```
+service nginx restart
+```
+
+Selanjutnya kita lakukan langkah uji coba.  
+Buka terminal `penny` dan tes hostname:
+```
+curl -I -H 'Host: penny.k15.com' http://127.0.0.1/
+```
+
+Masih di terminal `penny`, tes IP Penny:
+```
+curl -I -H 'Host: 10.71.4.2' http://127.0.0.1/
+```
+![image](/assets/soal13.png)  
+Terlihat bahwa respons yang diberikan ialah `HTTP/1.1 302 Moved Permanently` dengan location `http://www.k15.com/`
+
+Selanjutnya kita uji coba pada terminal `abbey`.  
+Tes hostname:
+```
+curl -I -H 'Host: abbey.k15.com' http://127.0.0.1/
+```
+
+Masih di terminal `abbey`, tes IP abbey:
+```
+curl -I -H 'Host: 10.71.2.2' http://127.0.0.1/
+```
+![image](/assets/soal13.1.png)  
+Terlihat bahwa respons yang diberikan ialah `HTTP/1.1 302 Moved Temporarily` dengan location `http://static.k15.com/`
+
+## Soal 14
+Cek terlebih dahulu apakah apache berjalan:
+```
+service apache2 status
+```
+
+Buka di terminal `obladi` dan aktifkan `mod_remoteip`
+```
+a2enmod remoteip
+```
+
+Buat konfigurasi Remote IP:
+```
+nano /etc/apache2/conf-available/remoteip.conf
+```
+
+Isi dengan ini:
+```
+RemoteIPHeader X-Real-IP
+RemoteIPInternalProxy 10.71.4.2
+```
+Di sini artinya Apache Obladi hanya akan mempercayai X-Real-IP jika request datang dari Penny.
+
+Lalu, aktifkan konfigurasi:
+```
+a2enconf remoteip
+```
+Dan cek konfigurasi apache:
+```
+apache2ctl configtest
+```
+Terakhir, restart apache:
+```
+service apache2 restart
+```
+
+Kemudian, lakukan juga hal yang sama persis pada terminal `desmond`. Kalo tidak jalankan saja file script yang sudah kami sediakan.
+
+Saatnya kita uji coba, gunakan client yang berbeda dari Penny, contohnya node `alpha`.
+```
+
+```
+
+## Soal 15
+placeholder
+
+## Soal 16
+placeholder
+
+## Soal 17
