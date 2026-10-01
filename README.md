@@ -308,7 +308,7 @@ up hostname molly && echo "molly" > /etc/hostname
 up echo "127.0.1.1 molly" >> /etc/hosts
 ```
 
-Kemudian, execute script `soal_5.sh` untuk memperbarui jika mengikuti langkah yang "up hostname..."
+Kemudian, execute script `soal_5_auto.sh` untuk memperbarui jika mengikuti langkah yang "up hostname..."
 
 setelah itu ketik `hostname` di terminal node manapun dia bakal menjawab dirinya sendiri.
 
@@ -710,13 +710,16 @@ Setelah itu, kamu bisa langsung melakukan pengujian dari terminal klien mengguna
 ```
 curl http://vault.k15.com/arsip/
 ```
+```
+curl http://vault.k15.com/arsip/dokumen1.txt
+```
 
 ![image](assets/soal9.2.png)
 
 ## Soal 10
 Soal kali ini kita diminta untuk membangun layanan web dinamis menggunakan Nginx dan PHP-FPM pada node *core* yang nantinya diakses melalui hostname seperti `core.k15.com`. Di dalam server tersebut, kita perlu membuat aplikasi PHP sederhana yang mencakup halaman beranda serta halaman profil. Selain itu, kita juga harus menerapkan aturan *rewrite* pada konfigurasi Nginx agar URL dapat diakses secara bersih tanpa ekstensi file; contohnya ketika pengguna mengakses `[core.k15.com/profil](https://core.k15.com/profil)`, server secara *backend* akan mengarahkannya ke file `profil.php` tanpa menampilkan ekstensi `.php` di bilah alamat *browser*. Terakhir, seluruh proses pengujian ini wajib dilakukan menggunakan hostname yang telah ditentukan, bukan melalui alamat IP langsung.
 
-Langkah pertama install Nginx dan PHP-FPM, masuk ke terminal node core (`rootkids`), lalu jalankan perintah berikut untuk menginstal Nginx serta PHP-FPM
+Langkah pertama install Nginx dan PHP-FPM, masuk ke terminal node core `oblada` dan `molly`, lalu jalankan perintah berikut untuk menginstal Nginx serta PHP-FPM
 ```
 apt-get update && apt-get install nginx php-fpm -y
 ```
