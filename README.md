@@ -920,7 +920,7 @@ oiya pastikan layanan web server `oblada` dan `molly` aktif pada port 80.
 ## Soal 12
 Sekarang kita diminta untuk mengamankan direktori atau path /admin pada server Penny menggunakan fitur HTTP Basic Authentication.
 
-Artinya, siapa pun yang mencoba mengakses [http://vault.k15.com/admin](http://vault.k15.com/admin) (atau IP `Penny` bagian vault) melalui browser atau perintah curl akan ditolak dan diminta memasukkan username dan password terlebih dahulu. Akses hanya akan diberikan jika memasukkan kombinasi kredensial yang tepat.
+Artinya, siapa pun yang mencoba mengakses `[http://vault.k15.com/admin](http://vault.k15.com/admin)` (atau IP `Penny` bagian vault) melalui browser atau perintah curl akan ditolak dan diminta memasukkan username dan password terlebih dahulu. Akses hanya akan diberikan jika memasukkan kombinasi kredensial yang tepat.
 
 Masuk ke terminal Penny, lalu pastikan tools utilitas Apache untuk enkripsi password sudah terinstal
 ```
@@ -932,35 +932,155 @@ htpasswd -c /etc/apache2/.htpasswd prabs
 ```
 Saat perintah ini dijalankan, terminal akan meminta kamu mengetikkan password. Masukkan password sesuai soal yaitu pakar_pinter_jadi_gob*** (teks password tidak akan nampak saat diketik demi keamanan, cukup ketik lalu tekan Enter).
 
-Buka file konfigurasi VirtualHost Penny (biasanya terletak di /etc/apache2/sites-available/vault-proxy.conf atau file konfigurasi default yang kamu gunakan), lalu tambahkan blok <Location /admin> di dalamnya
+Kemudian cek:
+```
+cat /etc/apache2/.htpasswd
+```
+![image](/assets/soal12.png)
+
+Masih di terminal penny, buka file konfigurasi VirtualHost Penny (biasanya terletak di /etc/apache2/sites-available/vault-proxy.conf atau file konfigurasi default yang kamu gunakan), lalu tambahkan blok <Location /admin> di dalamnya
+```
+nano /etc/apache2/sites-available/vault-proxy.conf
+```
 ```
 <VirtualHost *:80>
+
     ServerName vault.k15.com
 
+    # Meneruskan identitas asli pengunjung
     ProxyPreserveHost On
-    ProxyPass / balancer://vaultcluster/
-    ProxyPassReverse / balancer://vaultcluster/
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
 
-    <Proxy balancer://vaultcluster>
-        BalancerMember http://10.71.x.x route=obladi
-        BalancerMember http://10.71.x.x route=desmond
+    # Load balancing ke Obladi dan Desmond
+    <Proxy "balancer://vaultcluster">
+        BalancerMember http://10.71.3.4:80
+        BalancerMember http://10.71.3.5:80
         ProxySet lbmethod=byrequests
     </Proxy>
 
-    # --- TAMBAHKAN BAGIAN INI ---
-    <Location /admin>
+    ProxyPass / balancer://vaultcluster/
+    ProxyPassReverse / balancer://vaultcluster/
+
+    # Basic Authentication untuk /admin (BAGIAN INI YANG DITAMBAH)
+    <Location "/admin">
         AuthType Basic
         AuthName "Area Rahasia Sindikat"
         AuthUserFile /etc/apache2/.htpasswd
         Require valid-user
     </Location>
+
 </VirtualHost>
 ```
-Uji coba akses ke path /admin untuk memastikan proteksinya berfungsi
-```
-curl -I http://vault.k15.com/admin
-```
-Masuk ke server backend vault (`Obladi` dan `Desmond`), lalu buat folder atau file kosong untuk /admin agar tidak 404
 
-BELUM SELESAIIIIIII
-SUSAH BGT WOIII
+Lalu, aktifkan modul autentikasi dasar Apache di terminal `penny`:
+```
+a2enmod auth_basic
+a2enmod authn_file
+```
+
+Setelah itu, periksa integritas berkas konfigurasi sebelum menerapkan perubahan di `penny`:
+```
+apache2ctl configtest
+```
+
+Jika sudah OK, restart di terminal `penny`:
+```
+service apache2 restart
+```
+
+Kemudian, masuk ke terminal `obladi` dan buat folder `/admin` beserta `index.html` dan isinya.
+```
+mkdir -p /var/www/html/admin
+```
+```
+/var/www/html/admin/index.html
+```
+```
+cat << 'EOF' > /var/www/html/admin/index.html
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Vault Admin - Obladi</title>
+</head>
+<body>
+    <h1>Admin Area</h1>
+    <p>Backend: Obladi</p>
+    <p>Hostname: obladi</p>
+</body>
+</html>
+EOF
+```
+
+Lakukan yang mirip untuk terminal `desmond`.
+```
+mkdir -p /var/www/html/admin
+```
+```
+/var/www/html/admin/index.html
+```
+```
+cat << 'EOF' > /var/www/html/admin/index.html
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Vault Admin - Desmond</title>
+</head>
+<body>
+    <h1>Admin Area</h1>
+    <p>Backend: Desmond</p>
+    <p>Hostname: desmond</p>
+</body>
+</html>
+EOF
+```
+
+Cek di terminal manapun untuk memastikan sudah OK:
+```
+curl -i http://127.0.0.1/admin/
+```
+![image](/assets/soal12.1.png)
+
+Sekarang saatnya kita testing basic authentication. Masuk ke terminal `penny`.  
+Tanpa password:
+```
+curl -i -H 'Host: vault.k15.com' \
+http://127.0.0.1/admin/
+```
+
+Password salah:
+```
+curl -i -u 'prabs:salah' \
+-H 'Host: vault.k15.com' \
+http://127.0.0.1/admin/
+```
+
+Username salah:
+```
+curl -i -u 'salah:pakar_pinter_jadi_gob***' \
+-H 'Host: vault.k15.com' \
+http://127.0.0.1/admin/
+```
+Dari ketiga command di atas, seharusnya mengeluarkan output berupa `HTTP/1.1 401 Unauthorized`.
+
+Credential benar:
+```
+curl -i -u 'prabs:pakar_pinter_jadi_gob***' \
+-H 'Host: vault.k15.com' \
+http://127.0.0.1/admin/
+```
+![image](/assets/soal12.2.png)
+
+Pembuktian load balancing:
+```
+for i in {1..10}; do
+    curl -s \
+    -u 'prabs:pakar_pinter_jadi_gob***' \
+    -H 'Host: vault.k15.com' \
+    http://127.0.0.1/admin/ | grep 'Backend:'
+done
+```
+![image](assets/soal12.3.png)
+
+## Soal 13
