@@ -1246,15 +1246,269 @@ service apache2 restart
 Kemudian, lakukan juga hal yang sama persis pada terminal `desmond`. Kalo tidak jalankan saja file script yang sudah kami sediakan.
 
 Saatnya kita uji coba, gunakan client yang berbeda dari Penny, contohnya node `alpha`.
+Cari node `alpha`
+```
+hostname -I
 ```
 
+Kemudian coba akses vault:
 ```
+curl -H 'Host: vault.k15.com' http://10.71.4.2/
+```
+![image](/assets/soal14.png)
+
+Sekarang, pindah ke terminal `obladi` dan `desmond` dan jalankan ini:
+```
+tail -f /var/log/apache2/access.log
+```
+Kemudian lakukan request beberapa kali dari terminal `alpha`:
+```
+curl -H 'Host: vault.k15.com' http://10.71.4.2/
+```
+Terlihat beberapa datang dari `10.71.1.2`.  
+`obladi`
+![image](/assets/soal14.1.png)  
+`desmond`
+![image](/assets/soal14.2.png)
 
 ## Soal 15
-placeholder
+Pada soal ini, kita diminta agar pada `penny` bisa reverse proxy untuk path `/eternal` yang menyajikan directory `/var/www/eternal`, dan memastikan path ini dapat mengeksekusi (rendering) file `php`. Sementara pada `abbey`, buat jalur `/orion` yang menyajikan directory `/var/www/orion`, secara murni statis tanpa perlu rendering php.
+
+Sehingga, target di sini adalah:
+| Node      | Path       | Directory          | PHP                              |
+| --------- | ---------- | ------------------ | -------------------------------- |
+| **Penny** | `/eternal` | `/var/www/eternal` | **Bisa render PHP**              |
+| **Abbey** | `/orion`   | `/var/www/orion`   | **Statis, PHP tidak dieksekusi** |
+
+### Pertama, kita konfigurasi `penny` untuk `/eternal`. Buka terminal `penny`, instal apache dan PHP-FPM.
+```
+apt-get update
+apt-get install -y apache2 php-fpm
+```
+
+Di sini, script tidak langsung mengasumsikan nama service PHP-FPM. Nama service dicari dari `/etc/init.d/`:
+```
+PHP_SERVICE=$(ls /etc/init.d/ 2>/dev/null | grep -E '^php[0-9.]+-fpm$' | head -n 1)
+```
+Cara ini membuat script dapat menyesuaikan dengan versi PHP-FPM yang tersedia pada sistem.
+
+Setelah ditemukan, service PHP-FPM dijalankan:
+```
+service "$PHP_SERVICE" start
+```
+
+Selanjutnya kita akan mencari socket PHP-FPM:
+```
+PHP_SOCK=$(find /run/php /var/run/php -type s \
+    -name "php*-fpm.sock" 2>/dev/null | head -n 1)
+```
+
+Lalu, kita buat directory `/var/www/eternal`, masih di terminal `penny`.
+```
+mkdir -p /var/www/eternal
+```
+Buat file dan isinya dengan:
+```
+cat << 'EOF' > /var/www/eternal/index.php
+<?php
+echo "<h1>Eternal - Penny</h1>";
+echo "<p>PHP berhasil dirender.</p>";
+echo "<p>Hostname: " . gethostname() . "</p>";
+?>
+EOF
+```
+
+Selanjutnya, atur permission, masih di terminal `penny`.
+```
+chown -R www-data:www-data /var/www/eternal
+chmod -R 755 /var/www/eternal
+```
+
+Lalu, buat konfigurasi apache:
+```
+cat << EOF > /etc/apache2/sites-available/eternal.conf
+<VirtualHost *:80>
+
+    ServerName penny.xxx.com
+
+    Alias /eternal/ /var/www/eternal/
+
+    <Directory /var/www/eternal>
+        Options -Indexes
+        AllowOverride None
+        Require all granted
+        DirectoryIndex index.php index.html
+    </Directory>
+
+    <FilesMatch "\.php$">
+        SetHandler "proxy:unix:$PHP_SOCK|fcgi://localhost/"
+    </FilesMatch>
+
+</VirtualHost>
+EOF
+```
+
+Langkah selanjutnya kita akan mengaktifkan modul dan konfigurasi:
+```
+a2enmod proxy
+a2enmod proxy_fcgi
+```
+Kemudian konfigurasi `/eternal` diaktifkan:
+```
+a2ensite eternal.conf
+```
+Sebelum Apache dijalankan kembali, konfigurasi diperiksa:
+```
+apache2ctl configtest
+```
+Jika hasilnya sudah OK, Apache direstart:
+```
+service apache2 restart
+```
+
+### Setelah itu, kita lanjut Konfigurasi `abbey` untuk `/orion`. Buka terminal `abbey` dan instal nginx.
+```
+apt-get update
+apt-get install -y nginx
+```
+
+Lalu, buat direktori `/var/www/orion`, masih di `abbey`.
+```
+mkdir -p /var/www/orion
+```
+
+Buat file dan isinya dengan:
+```
+cat << 'EOF' > /var/www/orion/index.html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Orion - Abbey</title>
+</head>
+<body>
+    <h1>Orion - Abbey</h1>
+    <p>Halaman ini bersifat statis.</p>
+</body>
+</html>
+EOF
+```
+
+Kemudian, kita atur permission, masih di `abbey`.
+```
+chown -R www-data:www-data /var/www/orion
+chmod -R 755 /var/www/orion
+```
+
+Selanjutnya, atur konfigurasi nginx di `abbey` dengan:
+```
+cat << 'EOF' > /etc/nginx/sites-available/orion.conf
+server {
+    listen 80;
+
+    server_name abbey.xxx.com;
+
+    location /orion/ {
+        alias /var/www/orion/;
+        index index.html;
+    }
+}
+EOF
+```
+
+Jika sudah, lanjut mengaktifkan konfigurasi dan restart nginx.
+```
+ln -sf /etc/nginx/sites-available/orion.conf \
+/etc/nginx/sites-enabled/orion.conf
+```
+Periksa konfigurasi:
+```
+nginx -t
+```
+Jika valid, restart Nginx.
+```
+service nginx restart
+```
+
+### Test case
+Di sini kita uji `/eternal` pada Penny, untuk memastikan path `/eternal` dapat diakses dan PHP berhasil dirender. Jalankan di terminal `penny`.
+```
+curl -i -H 'Host: penny.xxx.com' http://127.0.0.1/eternal/
+```
+![image](/assets/soal15.png)
+
+Setelah itu, kita uji `/orion` pada Abbey, untuk memastikan path `/orion` dapat menyajikan directory statis. Jalankan di terminal `abbey`.
+```
+curl -i -H 'Host: abbey.xxx.com' http://127.0.0.1/orion/
+```
+![image](/assets/soal15.1.png)
+
+Kemudian, kita pastikan PHP tidak dirender pada Abbey. Jalankan di terminal `abbey`.  
+Buat file PHP sementara:
+```
+echo '<?php echo "PHP SHOULD NOT RUN"; ?>' > /var/www/orion/test.php
+```
+Kemudian akses:
+```
+curl -i -H 'Host: abbey.xxx.com' http://127.0.0.1/orion/test.php
+```
+Karena /orion merupakan jalur statis, file PHP tidak boleh diproses oleh PHP-FPM.  
+Setelah pengujian selesai, hapus file:
+```
+rm /var/www/orion/test.php
+```
+![image](/assets/soal15.2.png)
 
 ## Soal 16
-placeholder
+Pada soal ini dilakukan pengujian ketahanan gerbang The Mesh terhadap banyak permintaan menggunakan **ApacheBench** (`ab`).
+
+Pengujian dilakukan dari node **Alpha** terhadap dua endpoint:  
+- `www.k15.com`  
+- `static.k15.com`  
+
+Masing-masing endpoint diuji dengan:  
+- **250 requests**  
+- **Concurrency 10**  
+
+Pengujian ini bertujuan untuk memperoleh informasi mengenai kemampuan server dalam menangani sejumlah request secara bersamaan, termasuk jumlah request yang berhasil, request yang gagal, kecepatan request per detik, waktu respons, dan transfer rate.
+
+Seluruh langkah pada bagian ini dilakukan pada terminal `alpha`.
+
+Lakukan instalasi ApacheBench:
+```
+apt-get update
+apt-get install -y apache2-utils
+```
+
+Untuk memastikan ApacheBench tersedia:
+```
+ab -V
+```
+
+Selanjut kita akan melakukan pengujian terhadap `www.k15.com`.
+```
+ab -n 250 -c 10 http://www.k15.com/
+```
+Keterangan:
+| Parameter             | Fungsi                                           |
+| --------------------- | ------------------------------------------------ |
+| `ab`                  | Menjalankan ApacheBench                          |
+| `-n 250`              | Mengirim total 250 request                       |
+| `-c 10`               | Menjalankan maksimal 10 request secara bersamaan |
+| `http://www.k15.com/` | Endpoint yang diuji                              |
+
+Lalu kita akan melakukan pengujian terhadap `static.k15.com`.
+```
+ab -n 250 -c 10 http://static.k15.com/
+```
+
+Di sini kami sediakan script agar proses dapat berjalan otomatis dan hasil akan disimpan ke sebuah folder dengan `soal_16_alpha.sh`.
+
+![image](/assets/soal16.png)
+
+Analisis Hasil:  
+- Pada `www.k15.com`, ApacheBench menyelesaikan 250 request dalam **0.111 detik** dengan rata-rata **2261.65 requests/second** dan waktu per request **4.422 ms**.  
+- Pada `static.k15.com`, 250 request selesai dalam **0.039 detik** dengan rata-rata **6411.74 requests/second** dan waktu per request **1.560 ms**.  
+- Kedua endpoint menghasilkan **0 failed requests**, sehingga seluruh request yang diberikan selama pengujian berhasil diproses.
 
 ## Soal 17
 Soal kali ini kita diminta untuk menambahkan catatan atau konfigurasi DNS jenis TXT (Text) di server DNS utama kita (`prab` sebagai NS1 dan `tedd` sebagai NS2) untuk semua komputer klien (`Alpha`, `Beta`, `Gamma`, `Delta`, dan `Epsilon`).
