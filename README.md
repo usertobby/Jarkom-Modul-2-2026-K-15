@@ -1257,3 +1257,144 @@ placeholder
 placeholder
 
 ## Soal 17
+Soal kali ini kita diminta untuk menambahkan catatan atau konfigurasi DNS jenis TXT (Text) di server DNS utama kita (`prab` sebagai NS1 dan `tedd` sebagai NS2) untuk semua komputer klien (`Alpha`, `Beta`, `Gamma`, `Delta`, dan `Epsilon`).
+
+Langkah pertama kita masuk ke `prab` sebagai root atau gunakan sudo
+```
+su -
+```
+lalu lihat letak file zona utama pada /etc/bind/named.conf.local, yang ternyata tersimpan di dalam direktori /etc/bind/jarkom/k15.com.
+
+Membuka file zona dengan perintah
+```
+nano /etc/bind/jarkom/k15.com
+```
+tambahkan pada baris bagian bawah, jangan lupa naikkan satu digit pada bagian serialnya
+```
+; --- TXT Records untuk Klien Sayap Kiri & Kanan ---
+alpha       IN  TXT     "alpha"
+beta        IN  TXT     "beta"
+gamma       IN  TXT     "gamma"
+delta       IN  TXT     "delta"
+epsilon     IN  TXT     "epsilon"
+```
+pastikan konfigurasi zona tidak ada yang eror
+```
+named-checkzone k15.com /etc/bind/jarkom/k15.com
+```
+restart layanan DNS
+```
+service named restart
+```
+lakukan pengujian
+```
+dig TXT alpha.k15.com +short
+```
+
+![image](assets/soal17.png)
+
+## Soal 18
+Tugas kali ini adalah skenario praktis untuk menguji konsep TTL (Time to Live) dan DNS Caching pada server DNS (`prab` dan `tedd`).
+
+Secara garis besar, kita diminta untuk mengubah alamat IP dari subdomain `abbey.k15.com`, memperbarui masa berlaku cache-nya menjadi sangat singkat (15 detik), lalu mengamati bagaimana sistem DNS menangani perubahan data tersebut dalam tiga fase waktu yang berbeda.
+
+Masuk ke server `prab` sebagai root, lalu buka file zona domain
+```
+nano /etc/bind/jarkom/k15.com
+```
+Cari baris record untuk abbey, lalu ubah formatnya dengan menyisipkan TTL 15 detik dan mengganti alamat IP-nya dengan IP fiktif yang valid
+```
+abbey   15  IN  A   10.71.3.99
+```
+Naikkan angka Serial di bagian atas file zona (misalnya ditambah 1 digit) agar server sekunder (tedd) mendeteksi adanya perubahan, lalu simpan.
+
+Sebelum menerapkan, pastikan sintaks zona benar, lalu restart layanan DNS
+```
+named-checkzone k15.com /etc/bind/jarkom/k15.com
+service named restart
+```
+lakukan pengujian
+```
+dig abbey.k15.com
+```
+Berdasarkan hasil pengujian yang dilakukan dari terminal klien `alpha`, query DNS untuk domain `abbey`.k15.com telah berhasil diverifikasi dengan menampilkan masa TTL sebesar 15 detik serta mengarahkan ke alamat IP fiktif 10.71.3.99. Hal ini mengonfirmasi bahwa perubahan konfigurasi pada server DNS utama telah berhasil diterapkan dan terbaca dengan sempurna oleh sisi klien.
+
+![image](assets/soal18.png)
+
+## Soal 19
+Kali ini tugasnya meminta kita untuk membuat sebuah CNAME (Canonical Name) record. Secara sederhana, CNAME berfungsi untuk membuat alias dari suatu domain ke domain lainnya.
+
+Fungsi: Mengarahkan satu nama domain (alias) ke domain tujuan yang sebenarnya (FQDN). Dalam kasus ini, domain internal kita (outbound.k15.com) akan di-binding atau diarahkan ke domain eksternal (badssl.com).
+
+Catatan Penting: Nilai tujuan CNAME harus berupa nama domain, bukan URL lengkap. Jadi, kita tidak menuliskan [http://http.badssl.com](http://http.badssl.com), melainkan cukup mengarahkannya ke badssl.com.
+
+Buka file zona DNS utama di server `prab`
+```
+nano /etc/bind/jarkom/k15.com
+```
+Tambahkan baris CNAME record di bagian bawah file zona
+```
+outbound    IN  CNAME   badssl.com.
+```
+Naikkan angka Serial SOA di bagian atas file zona agar server sekunder (tedd) mendeteksi perubahan.
+
+Pastikan konfigurasi zona tidak error, lalu restart layanan BIND9 di server `prab`
+```
+named-checkzone k15.com /etc/bind/jarkom/k15.com
+service named restart
+```
+Pindah ke terminal klien (misalnya `alpha`), lalu jalankan perintah curl ke domain baru tersebut
+```
+curl http://outbound.k15.com
+```
+![image](assets/soal19.png)
+
+## Soal 20
+Soal kali ini pembersihan sebelum melakukan demo.
+
+Memastikan Semua Servis Berjalan Normal & Autostart: Kamu harus memastikan seluruh layanan yang telah dikerjakan dari awal (seperti BIND9, Apache, Nginx, PHP-FPM, dll.) berjalan dengan normal tanpa error dan diset agar aktif secara otomatis (autostart / enable) saat node-nya direstart. Ini penting agar ketika asisten nanti melakukan restart node saat demo, semua servis langsung menyala sendiri.
+
+Mengembalikan Konfigurasi Nomor 18: Khusus untuk pengujian TTL pada soal nomor 18 (di mana kita sempat mengubah A record abbey menjadi IP fiktif), kamu diperintahkan untuk mengembalikannya seperti semula (mengembalikan IP asli abbey).
+
+Karena pada soal nomor 18 kita sempat mengubah IP abbey menjadi IP fiktif untuk pengujian TTL, kita harus mengembalikannya ke IP aslinya (10.71.2.2), masuk ke server `prab`
+```
+nano /etc/bind/jarkom/k15.com
+```
+Ubah baris catatan abbey kembali ke alamat IP aslinya
+```
+abbey    IN  A   10.71.2.2
+```
+oiya jangan lupa naikkan angka Serial SOA di bagian atas file zona (tambahkan 1 digit angka).
+
+Simpan file, lalu jalankan validasi dan restart BIND9
+```
+named-checkzone k15.com /etc/bind/jarkom/k15.com
+service named restart
+```
+Pastikan semua layanan penting di masing-masing node server (seperti BIND9 di `prab`/`tedd`, Apache/Nginx di reverse proxy dan web server) diset agar aktif secara otomatis saat node direstart.
+
+Buka atau buat file /etc/rc.local
+```
+nano /etc/rc.local
+```
+untuk yang menggunakan BIND9, `prab` & `tedd`
+```
+#!/bin/sh
+service bind9 start
+```
+untuk yang menggunakan Apache, `penny`, `obladi`, dan `desmond`
+```
+#!/bin/sh
+service apache2 start
+```
+
+untuk yang menggunakan Nginx & FHP-FPM, `abbey`, `oblada`, dan `molly`
+```
+#!/bin/sh
+service nginx start
+service php8.4-fpm start
+```
+oiya jangan lupa beri izin eksekusi semuanya
+```
+chmod +x /etc/rc.local
+```
