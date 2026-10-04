@@ -918,6 +918,12 @@ curl -I http://core.k15.com/
 oiya pastikan layanan web server `oblada` dan `molly` aktif pada port 80.
 
 ## Soal 12
+Untuk soal ini hingga soal nomor 15, kita gunakan lynx untuk uji coba aksesnya, pertama instalasi dengan:
+```
+apt-get update
+apt-get install -y lynx
+```
+
 Sekarang kita diminta untuk mengamankan direktori atau path /admin pada server Penny menggunakan fitur HTTP Basic Authentication.
 
 Artinya, siapa pun yang mencoba mengakses `[http://vault.k15.com/admin](http://vault.k15.com/admin)` (atau IP `Penny` bagian vault) melalui browser atau perintah curl akan ditolak dan diminta memasukkan username dan password terlebih dahulu. Akses hanya akan diberikan jika memasukkan kombinasi kredensial yang tepat.
@@ -1089,6 +1095,12 @@ Pada soal ini diminta penerapan standarisasi nama kanonik (canonical hostname) m
 
 - Pada Abbey (Nginx): Setiap akses langsung via IP Abbey (`10.71.2.2`) maupun via domain `abbey.k15.com` harus dialihkan secara sementara (Status Code 302 Found) ke domain resmi `static.k15.com`.
 
+Jangan lupa instalasi lynx dengan:
+```
+apt-get update
+apt-get install -y lynx
+```
+
 Pertama, buka terminal `penny`:
 ```
 nano /etc/apache2/sites-available/penny-redirect.conf
@@ -1208,6 +1220,12 @@ curl -I -H 'Host: 10.71.2.2' http://127.0.0.1/
 Terlihat bahwa respons yang diberikan ialah `HTTP/1.1 302 Moved Temporarily` dengan location `http://static.k15.com/`
 
 ## Soal 14
+Jangan lupa instalasi lynx dengan:
+```
+apt-get update
+apt-get install -y lynx
+```
+
 Cek terlebih dahulu apakah apache berjalan:
 ```
 service apache2 status
@@ -1279,6 +1297,12 @@ Sehingga, target di sini adalah:
 | --------- | ---------- | ------------------ | -------------------------------- |
 | **Penny** | `/eternal` | `/var/www/eternal` | **Bisa render PHP**              |
 | **Abbey** | `/orion`   | `/var/www/orion`   | **Statis, PHP tidak dieksekusi** |
+
+Jangan lupa instalasi lynx dengan:
+```
+apt-get update
+apt-get install -y lynx
+```
 
 ### Pertama, kita konfigurasi `penny` untuk `/eternal`. Buka terminal `penny`, instal apache dan PHP-FPM.
 ```
